@@ -11,7 +11,6 @@
 		8DD76F9C0486AA7600D96B5E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* Foundation.framework */; };
 		8DD76F9F0486AA7600D96B5E /* MapDBImporter.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = C6859EA3029092ED04C91782 /* MapDBImporter.1 */; };
 		DD5FC42111C8572E0026F76B /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = DD5FC42011C8572E0026F76B /* libsqlite3.dylib */; };
-		DD5FC61511C8AC580026F76B /* libcrypto.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = DD5FC61411C8AC580026F76B /* libcrypto.dylib */; };
 		DD72C33F11E5392E0030C637 /* FMDatabase.m in Sources */ = {isa = PBXBuildFile; fileRef = DD72C33A11E5392E0030C637 /* FMDatabase.m */; };
 		DD72C34011E5392E0030C637 /* FMDatabaseAdditions.m in Sources */ = {isa = PBXBuildFile; fileRef = DD72C33C11E5392E0030C637 /* FMDatabaseAdditions.m */; };
 		DD72C34111E5392E0030C637 /* FMResultSet.m in Sources */ = {isa = PBXBuildFile; fileRef = DD72C33E11E5392E0030C637 /* FMResultSet.m */; };
@@ -37,7 +36,6 @@
 		8DD76FA10486AA7600D96B5E /* MapDBImporter */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MapDBImporter; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6859EA3029092ED04C91782 /* MapDBImporter.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = MapDBImporter.1; sourceTree = "<group>"; };
 		DD5FC42011C8572E0026F76B /* libsqlite3.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libsqlite3.dylib; path = /usr/lib/libsqlite3.dylib; sourceTree = "<absolute>"; };
-		DD5FC61411C8AC580026F76B /* libcrypto.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.dylib; path = usr/lib/libcrypto.dylib; sourceTree = SDKROOT; };
 		DD72C33911E5392E0030C637 /* FMDatabase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FMDatabase.h; path = src/FMDatabase.h; sourceTree = "<group>"; };
 		DD72C33A11E5392E0030C637 /* FMDatabase.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = FMDatabase.m; path = src/FMDatabase.m; sourceTree = "<group>"; };
 		DD72C33B11E5392E0030C637 /* FMDatabaseAdditions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FMDatabaseAdditions.h; path = src/FMDatabaseAdditions.h; sourceTree = "<group>"; };
@@ -53,7 +51,6 @@
 			files = (
 				8DD76F9C0486AA7600D96B5E /* Foundation.framework in Frameworks */,
 				DD5FC42111C8572E0026F76B /* libsqlite3.dylib in Frameworks */,
-				DD5FC61511C8AC580026F76B /* libcrypto.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				08FB7795FE84155DC02AAC07 /* Source */,
+				DDF2522A11F0D1510041F0E0 /* Externals */,
 				C6859EA2029092E104C91782 /* Documentation */,
 				08FB779DFE84155DC02AAC07 /* External Frameworks and Libraries */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
@@ -76,7 +74,6 @@
 			children = (
 				32A70AAB03705E1F00C91783 /* MapDBImporter_Prefix.pch */,
 				08FB7796FE84155DC02AAC07 /* MapDBImporter.m */,
-				DD6E3A5E11CFFE80007691F3 /* fmdb */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -86,7 +83,6 @@
 			children = (
 				08FB779EFE84155DC02AAC07 /* Foundation.framework */,
 				DD5FC42011C8572E0026F76B /* libsqlite3.dylib */,
-				DD5FC61411C8AC580026F76B /* libcrypto.dylib */,
 			);
 			name = "External Frameworks and Libraries";
 			sourceTree = "<group>";
@@ -107,7 +103,7 @@
 			name = Documentation;
 			sourceTree = "<group>";
 		};
-		DD6E3A5E11CFFE80007691F3 /* fmdb */ = {
+		DD6E3A5E11CFFE80007691F3 /* FMDB */ = {
 			isa = PBXGroup;
 			children = (
 				DD72C33911E5392E0030C637 /* FMDatabase.h */,
@@ -117,7 +113,16 @@
 				DD72C33D11E5392E0030C637 /* FMResultSet.h */,
 				DD72C33E11E5392E0030C637 /* FMResultSet.m */,
 			);
+			name = FMDB;
 			path = fmdb;
+			sourceTree = "<group>";
+		};
+		DDF2522A11F0D1510041F0E0 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+				DD6E3A5E11CFFE80007691F3 /* FMDB */,
+			);
+			name = Externals;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

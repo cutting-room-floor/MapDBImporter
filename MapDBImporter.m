@@ -1,85 +1,128 @@
 #import <Foundation/Foundation.h>
 #import "FMDatabase.h"
 #import "FMDatabaseAdditions.h"
-#include <openssl/md5.h>
 
-#define DS_DB_PATH    (@"/Users/incanus/Documents/Projects/Development Seed/Mapping/stuff to not backup/world-light.sql")
-#define DS_TILES_PATH (@"/Volumes/MAPSONSTICK/tiles/1.0.0/world-light")
+int error_die (NSString *message)
+{
+    printf("%s", [message cStringUsingEncoding:NSUTF8StringEncoding]);
+
+    return 1;
+}
 
 int main (int argc, const char *argv[])
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
+    NSMutableArray *args = [NSMutableArray array];
+    
+    NSError *error;
+
+    NSArray *allowedFormats = [NSArray arrayWithObjects:@"png", @"jpg", nil];
+    
+    // parse args into objc
+    //
+    if (argc > 1)
+    {
+        for (NSUInteger i = 1; i < argc; i++)
+            [args addObject:[NSString stringWithCString:argv[i] encoding:NSUTF8StringEncoding]];
+    }
+
+    // check for overwrite
+    //
+    BOOL forceOverwrite = [args containsObject:@"-f"];
+    
+    if (forceOverwrite)
+        [args removeObject:@"-f"];
+    
+    // check for format
+    //
+    NSString *format = nil;
+    
+    for (NSString *allowedFormat in allowedFormats)
+        if ([args containsObject:[NSString stringWithFormat:@"--format=%@", allowedFormat]])
+            format = allowedFormat;
+    
+    [args filterUsingPredicate:[NSPredicate predicateWithFormat:@"NOT SELF BEGINSWITH %@", @"--format="]];
+
+    // check for number of args
+    //
+    if ([args count] < 2 || ! format)
+    {
+        NSString *usageString = [NSString stringWithFormat:@"Usage: %@ [-f] --format=(%@) <tile source directory> <destination SQLite file>\n", [NSString stringWithCString:argv[0] encoding:NSUTF8StringEncoding], [allowedFormats componentsJoinedByString:@","]];
+        
+        return error_die(usageString);
+    }
+
     NSFileManager *fileManager = [NSFileManager defaultManager];
+
+    NSString *source      = [args objectAtIndex:0];
+    NSString *destination = [args objectAtIndex:1];
     
-    //[fileManager removeItemAtPath:DS_DB_PATH error:NULL];
+    // check for source file
+    //
+    BOOL isDirectory = NO;
     
-    FMDatabase *db = [FMDatabase databaseWithPath:DS_DB_PATH];
+    if ( ! [fileManager fileExistsAtPath:source isDirectory:&isDirectory] || ! isDirectory)
+        return error_die([NSString stringWithFormat:@"Source directory not found at %@\n", source]);
+    
+    // check for destination file
+    //
+    if ([fileManager fileExistsAtPath:destination] && ! forceOverwrite)
+        return error_die([NSString stringWithFormat:@"Destination file exists at %@ (-f to force overwrite)\n", destination]);
+    
+    // remove destination if necessary
+    //
+    if ([fileManager fileExistsAtPath:destination] && forceOverwrite)
+    {
+        [fileManager removeItemAtPath:destination error:&error];
+        
+        if (error)
+            return error_die([NSString stringWithFormat:@"Unable to remove destination file at %@\n", destination]);
+    }
+    
+    // open & create database
+    //
+    FMDatabase *db = [FMDatabase databaseWithPath:destination];
     
     if ([db open])
     {
-        FMResultSet *select = [db executeQuery:@"select zoom_level, tile_column, tile_row, tile_data from tiles"];
-        
-        if ([db hadError])
-            NSLog(@"error selecting: %@", [db lastErrorMessage]);
-        
-        while ([select next])
-        {
-            NSData *data = [select dataForColumn:@"tile_data"];
-
-            unsigned char *result = MD5([data bytes], [data length], NULL);
-            
-            NSString *hash = [NSString stringWithFormat:@"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                    result[0],  result[1],  result[2],  result[3], 
-                    result[4],  result[5],  result[6],  result[7],
-                    result[8],  result[9],  result[10], result[11],
-                    result[12], result[13], result[14], result[15]];
-            
-            NSLog(@"MD5 (./%qlu/%qlu/%qlu.png) = %@", [select intForColumn:@"zoom_level"], [select intForColumn:@"tile_column"], [select intForColumn:@"tile_row"], hash);
-        }
-        
-        [select close];
-        
-        [db close];
-        
-        [pool drain];
-        
-        return 0;
-        
         [db executeUpdate:@"create table tiles (zoom_level integer, tile_column integer, tile_row integer, tile_data blob)"];
         [db executeUpdate:@"create unique index tile_index on tiles (zoom_level, tile_column, tile_row)"];
         
         NSUInteger count = 0;
         
-        NSArray *zooms = [fileManager contentsOfDirectoryAtPath:DS_TILES_PATH error:NULL];
+        NSArray *zooms = [fileManager contentsOfDirectoryAtPath:source error:NULL];
         
-        //NSLog(@"there are %qlu zooms total", [zooms count]);
-        
+        // iterate zoom folders
+        //
         for (NSString *zoom in zooms)
         {
-            NSArray *columns = [fileManager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/%@", DS_TILES_PATH, zoom] error:NULL];
+            NSArray *columns = [fileManager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/%@", source, zoom] error:NULL];
 
-            //NSLog(@"there are %qlu columns in zoom %@", [columns count], zoom);
-
+            // iterate column folders
+            //
             for (NSString *column in columns)
             {
                 [db beginTransaction];                
 
                 NSAutoreleasePool *columnPool = [[NSAutoreleasePool alloc] init];
                 
-                NSArray *rows = [fileManager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/%@/%@", DS_TILES_PATH, zoom, column] error:NULL];
+                NSArray *rows = [fileManager contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%@/%@/%@", source, zoom, column] error:NULL];
 
-                //NSLog(@"there are %qlu rows in column %@ of zoom %@", [rows count], column, zoom);
-
+                // iterate row files
+                //
                 for (NSString *row in rows)
                 {
-                    if ([row hasSuffix:@".png"])
+                    if (format && [row hasSuffix:format])
                     {
-                        NSData *data = [NSData dataWithContentsOfFile:[NSString stringWithFormat:@"%@/%@/%@/%@", DS_TILES_PATH, zoom, column, row]];
+                        NSString *filePath = [NSString stringWithFormat:@"%@/%@/%@/%@", source, zoom, column, row];
                         
-                        row = [row stringByReplacingOccurrencesOfString:@".png" withString:@""];
+                        NSData *data = [NSData dataWithContentsOfFile:filePath];
                         
-                        //NSLog(@"z:%@ c:%@ r:%@ d:%qlu", zoom, column, row, [data length]);
+                        if ( ! data)
+                            return error_die([NSString stringWithFormat:@"Unable to read source file at %@\n", filePath]);
+                        
+                        row = [row stringByReplacingOccurrencesOfString:[NSString stringWithFormat:@".%@", format] withString:@""];
                         
                         [db executeUpdate:@"insert into tiles (zoom_level, tile_column, tile_row, tile_data) values (?, ?, ?, ?)", [NSNumber numberWithInt:[zoom integerValue]],
                                                                                                                                    [NSNumber numberWithInt:[column integerValue]],
@@ -87,8 +130,8 @@ int main (int argc, const char *argv[])
                                                                                                                                    data];
                         
                         if ([db hadError])
-                            NSLog(@"error with entry %qlu: %@", count, [db lastErrorMessage]);
-                        
+                            return error_die([NSString stringWithFormat:@"Problem inserting record %i,%i,%i into destination database: %@\n", [zoom integerValue], [column integerValue], [row integerValue], [db lastErrorMessage]]);
+
                         else
                             count++;
                     }
@@ -96,19 +139,17 @@ int main (int argc, const char *argv[])
                 
                 [db commit];
                 
-                NSLog(@"completed column %@ for zoom %@", column, zoom);
-                
                 [columnPool drain];
             }
         }
                      
         [db close];
         
-        NSLog(@"inserted %qlu records", count);
+        printf("%s", [[NSString stringWithFormat:@"Successfully inserted %qlu records at %@\n", count, destination] cStringUsingEncoding:NSUTF8StringEncoding]);
     }
 
     else
-        NSLog(@"can't open db");
+        return error_die([NSString stringWithFormat:@"Unable to open destination database at %@\n", destination]);
     
     [pool drain];
     
