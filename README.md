@@ -2,12 +2,24 @@
 
 MapDBImporter is a simple command-line Objective-C tool to take a folder of MapBox tiles and put them in a SQLite database. 
 
-It's a little rough right now; sorry about that.
-
 ## Usage
 
-You will need to edit the two `#define` statements at the top to point to your desired destination SQLite file path and your tile directory source path.
+`MapDBImporter [-f] --format=(png,jpg) <tile source directory> <destination SQLite file>`
 
-You might want to replace the occurrences of `png` with `jpg` depending on your need.
+### Arguments
 
-The tool will output the MD5 hash of the PNG data from each zoom/column/row record. You can compare this to the original hash using something like `find /src/path -type f | xargs md5sum` to check import integrity.
+`-f`
+
+Force removal of destination file if it already exists.
+
+`--format=(png,jpg)`
+
+Choose which type of file to use if both are found in the tile folders.
+
+`<tile source directory>`
+
+The path to the folder containing the `zoom` folders, which contain `y` folders, which contain `x` files.
+
+`<destination SQLite file>`
+
+The desired output file. It's recommended to use `filename.mbtiles`.
