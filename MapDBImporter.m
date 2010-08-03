@@ -4,7 +4,7 @@
 
 int error_die (NSString *message)
 {
-    printf("%s", [message cStringUsingEncoding:NSUTF8StringEncoding]);
+    printf("%s", [[@"\n" stringByAppendingString:message] cStringUsingEncoding:NSUTF8StringEncoding]);
 
     return 1;
 }
@@ -13,51 +13,58 @@ int main (int argc, const char *argv[])
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
-    NSMutableArray *args = [NSMutableArray array];
+    NSDictionary *args = [[NSUserDefaults standardUserDefaults] volatileDomainForName:NSArgumentDomain];
     
     NSError *error;
 
     NSArray *allowedFormats = [NSArray arrayWithObjects:@"png", @"jpg", nil];
     
-    // parse args into objc
+    // check for required args
     //
-    if (argc > 1)
+    if ( ! [args objectForKey:@"f"] || ! [allowedFormats containsObject:[args objectForKey:@"f"]] || ! [args objectForKey:@"s"] || ! [args objectForKey:@"d"])
     {
-        for (NSUInteger i = 1; i < argc; i++)
-            [args addObject:[NSString stringWithCString:argv[i] encoding:NSUTF8StringEncoding]];
-    }
-
-    // check for overwrite
-    //
-    BOOL forceOverwrite = [args containsObject:@"-f"];
-    
-    if (forceOverwrite)
-        [args removeObject:@"-f"];
-    
-    // check for format
-    //
-    NSString *format = nil;
-    
-    for (NSString *allowedFormat in allowedFormats)
-        if ([args containsObject:[NSString stringWithFormat:@"--format=%@", allowedFormat]])
-            format = allowedFormat;
-    
-    [args filterUsingPredicate:[NSPredicate predicateWithFormat:@"NOT SELF BEGINSWITH %@", @"--format="]];
-
-    // check for number of args
-    //
-    if ([args count] < 2 || ! format)
-    {
-        NSString *usageString = [NSString stringWithFormat:@"Usage: %@ [-f] --format=(%@) <tile source directory> <destination SQLite file>\n", [NSString stringWithCString:argv[0] encoding:NSUTF8StringEncoding], [allowedFormats componentsJoinedByString:@","]];
+        NSString *usageString = [NSString stringWithFormat:@"Usage: %@ -f (%@) [-m<key1> <value1> [-m<key2> <value2>] ... ] [-M <metadata file>] -s <tile source directory> -d <destination mbtiles file>\n", [NSString stringWithCString:argv[0] encoding:NSUTF8StringEncoding], [allowedFormats componentsJoinedByString:@","]];
         
         return error_die(usageString);
     }
+    
+    // check for metadata args
+    //
+    NSMutableDictionary *metadata = [NSMutableDictionary dictionary];
+    
+    for (NSString *key in [args allKeys])
+        if ([key hasPrefix:@"m"])
+            [metadata setObject:[args objectForKey:key] forKey:[key substringWithRange:NSMakeRange(1, [key length] - 1)]];
+    
+    if ([[metadata allKeys] count] == 0)
+        printf("%s", [@"WARNING: No metadata provided!" cStringUsingEncoding:NSUTF8StringEncoding]);
 
+    // read in metadata file
+    //
+    if ([args objectForKey:@"M"])
+    {
+        NSString *metadataFile = [NSString stringWithContentsOfFile:[args objectForKey:@"M"] encoding:NSUTF8StringEncoding error:&error];
+        
+        if (error)
+            return error_die([NSString stringWithFormat:@"Unable to read metadata file %@\n", [args objectForKey:@"M"]]);
+        
+        for (NSString *pair in [metadataFile componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]])
+        {
+            if ([[pair componentsSeparatedByString:@" = "] count] >= 2)
+            {
+                NSArray *parts = [pair componentsSeparatedByString:@" = "];
+                
+                [metadata setObject:[parts objectAtIndex:1] forKey:[parts objectAtIndex:0]];
+            }
+        }
+    }
+    
+    NSString *source      = [args objectForKey:@"s"];
+    NSString *destination = [args objectForKey:@"d"];
+    NSString *format      = [args objectForKey:@"f"];
+    
     NSFileManager *fileManager = [NSFileManager defaultManager];
 
-    NSString *source      = [args objectAtIndex:0];
-    NSString *destination = [args objectAtIndex:1];
-    
     // check for source file
     //
     BOOL isDirectory = NO;
@@ -67,18 +74,8 @@ int main (int argc, const char *argv[])
     
     // check for destination file
     //
-    if ([fileManager fileExistsAtPath:destination] && ! forceOverwrite)
-        return error_die([NSString stringWithFormat:@"Destination file exists at %@ (-f to force overwrite)\n", destination]);
-    
-    // remove destination if necessary
-    //
-    if ([fileManager fileExistsAtPath:destination] && forceOverwrite)
-    {
-        [fileManager removeItemAtPath:destination error:&error];
-        
-        if (error)
-            return error_die([NSString stringWithFormat:@"Unable to remove destination file at %@\n", destination]);
-    }
+    if ([fileManager fileExistsAtPath:destination])
+        return error_die([NSString stringWithFormat:@"Destination file exists at %@\n", destination]);
     
     // open & create database
     //
@@ -86,6 +83,8 @@ int main (int argc, const char *argv[])
     
     if ([db open])
     {
+        // main tile records
+        //
         [db executeUpdate:@"create table tiles (zoom_level integer, tile_column integer, tile_row integer, tile_data blob)"];
         [db executeUpdate:@"create unique index tile_index on tiles (zoom_level, tile_column, tile_row)"];
         
@@ -142,10 +141,18 @@ int main (int argc, const char *argv[])
                 [columnPool drain];
             }
         }
-                     
+        
+        // metadata records
+        //
+        [db executeUpdate:@"create table metadata (name text, value text)"];
+        [db executeUpdate:@"create unique index name on metadata (name)"];
+
+        for (NSString *key in [metadata allKeys])
+            [db executeUpdate:@"insert into metadata (name, value) values (?, ?)", key, [metadata objectForKey:key]];
+                
         [db close];
         
-        printf("%s", [[NSString stringWithFormat:@"Successfully inserted %qlu records at %@\n", count, destination] cStringUsingEncoding:NSUTF8StringEncoding]);
+        printf("%s", [[NSString stringWithFormat:@"\nSuccessfully inserted %qlu records with %i metadata pairs at %@\n", count, [[metadata allKeys] count], destination] cStringUsingEncoding:NSUTF8StringEncoding]);
     }
 
     else
